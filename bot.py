@@ -41,7 +41,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "Evveet! Hangi oyun için feedback atıyorsun? \n⚠️ **Önemli:** Mutlaka **ekran görüntüsü (fotoğraf)** göndermelisin ve açıklama kısmına oyun adını (PUBG, Roblox, Standoff, Counter, Flame) yazmalısın. Sadece metin kabul edilmez!",
+            "Evveet! Lütfen ekran görüntüsünü (fotoğrafı) ve hangi oyunla ilgili olduğunu (PUBG, Roblox, Standoff, Counter, Flame) birlikte gönder:",
             reply_markup=reply_markup
         )
 
@@ -71,29 +71,29 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
         
-        # 1. KURAL: Fotoğraf zorunluluğu (Eğer fotoğraf yoksa hata ver)
+        # 1. KURAL: Fotoğraf zorunluluğu
         if not update.message.photo:
             await update.message.reply_text(
-                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükleyerek tekrar dene."
+                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükle."
             )
             return
 
-        # Fotoğrafın üzerindeki yazı (caption) veya kullanıcının gönderdiği metin
-        user_text = update.message.caption or ""
+        # Fotoğrafın üzerindeki yazı (caption) VEYA kullanıcının aynı anda yazdığı metni alıyoruz
+        user_text = update.message.caption or update.message.text or ""
         mesaj_kucuk = user_text.lower()
         
-        # 2. KURAL: Oyun adı kontrolü
+        # 2. KURAL: Oyun adı kontrolü (Metni direkt tarıyor)
         oyun_bulundu = any(oyun in mesaj_kucuk for oyun in IZIN_VERILEN_OYUNLAR)
 
         if not oyun_bulundu:
             await update.message.reply_text(
-                "❌ **Hata!** Gönderdiğiniz fotoğrafın açıklamasında desteklenen oyunlardan biri (PUBG, Roblox, Standoff, Counter, Flame) bulunamadı. Lütfen açıklama kısmına oyun adını ekleyerek tekrar fotoğraf gönderin."
+                "❌ **Hata!** Gönderdiğin mesajda/açıklamada desteklenen oyunlardan biri (PUBG, Roblox, Standoff, Counter, Flame) bulunamadı. Lütfen oyun adını da ekleyerek tekrar gönder."
             )
             return
 
-        # Her şey uygunsa fotoğrafı ve bilgileri kanala ilet
+        # Her şey uygunsa fotoğrafı ve metni kanala ilet
         photo_file_id = update.message.photo[-1].file_id
-        baslik = f"📩 **Yeni Feedback Var!**\n👤 Gönderen: {user.first_name} (@{user.username})\n🆔 ID: `{user.id}`\n\n💬 **Açıklama:** {user_text}"
+        baslik = f"📩 **Yeni Feedback Var!**\n👤 Gönderen: {user.first_name} (@{user.username})\n🆔 ID: `{user.id}`\n\n💬 **Mesaj:** {user_text}"
 
         await context.bot.send_photo(
             chat_id=FEEDBACK_CHANNEL_ID,
@@ -120,3 +120,4 @@ if __name__ == '__main__':
 
     print("Bot çalışıyor...")
     app.run_polling()
+    
