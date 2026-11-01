@@ -42,7 +42,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "Evveet! Lütfen ilgili oyunun (PUBG, Roblox, Standoff, Counter-Strike veya Flame) ekran görüntüsünü (SS'ini) gönder. Yapay zeka kontrol edip onaylayacak!",
+            "Evveet! Lütfen ilgili oyunun ekran görüntüsünü gönder. Yapay zeka kontrol edecek!",
             reply_markup=reply_markup
         )
 
@@ -67,7 +67,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ana_menu_markup()
         )
 
-# Yapay Zeka ile Fotoğrafı Analiz Etme Fonksiyonu
+# Yapay Zeka ile Fotoğrafı Esnek Analiz Etme
 async def yapay_zeka_oyun_kontrolu(photo_file_url):
     try:
         response = client.chat.completions.create(
@@ -78,7 +78,7 @@ async def yapay_zeka_oyun_kontrolu(photo_file_url):
                     "content": [
                         {
                             "type": "text",
-                            "text": "Bu fotoğraf PUBG, Roblox, Standoff, Counter-Strike (CS) veya Flame oyunlarından birine ait bir ekran görüntüsü (SS) mü? Sadece 'EVET' veya 'HAYIR' olarak cevap ver. Başka hiçbir şey yazma."
+                            "text": "Bu görsel herhangi bir video oyununa, oyun ekranına, lobiye, menüye veya oyun içi bir görüntüye (PUBG, Roblox, Standoff, Counter, Flame vb.) benziyor mu? Lütfen çok esnek ol ve oyunla ilgili herhangi bir görselse sadece 'EVET' de. Alakasız bir fotoğrafsa (kedi, insan yüzü, manzara vb.) 'HAYIR' de. Sadece EVET veya HAYIR yaz."
                         },
                         {
                             "image_url": {"url": photo_file_url},
@@ -93,38 +93,35 @@ async def yapay_zeka_oyun_kontrolu(photo_file_url):
         return "EVET" in cevap
     except Exception as e:
         print(f"Yapay zeka hata verdi: {e}")
-        return False
+        return True # Hata durumunda kullanıcıyı mağdur etmemek için geçmesine izin verelim
 
-# Kullanıcının gönderdiği feedback mesajlarını yapay zeka ile denetleyen fonksiyon
+# Kullanıcının gönderdiği feedback mesajlarını denetleyen fonksiyon
 async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
         
-        # Fotoğraf zorunluluğu
         if not update.message.photo:
             await update.message.reply_text(
-                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükle."
+                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü yükle."
             )
             return
 
-        bekleme_mesaji = await update.message.reply_text("🤖 Yapay zeka ekran görüntüsünü inceliyor, lütfen bekle...")
+        bekleme_mesaji = await update.message.reply_text("🤖 Yapay zeka inceliyor...")
 
         try:
             photo_file = await update.message.photo[-1].get_file()
             photo_url = photo_file.file_path
 
-            # Yapay zekaya fotoğrafı yollayıp oyun ekran görüntüsü mü diye test ettiriyoruz
             oyun_onaylandi = await yapay_zeka_oyun_kontrolu(photo_url)
 
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=bekleme_mesaji.message_id)
 
             if not oyun_onaylandi:
                 await update.message.reply_text(
-                    "❌ **Yapay Zeka Reddetti!** Bu fotoğraf desteklenen oyunlardan (PUBG, Roblox, Standoff, Counter, Flame) birine ait bir ekran görüntüsü gibi görünmüyor. Lütfen geçerli bir oyun SS'i at."
+                    "❌ **Yapay Zeka Reddetti!** Bu fotoğraf bir oyun ekran görüntüsüne benzemiyor. Lütfen geçerli bir oyun SS'i at."
                 )
                 return
 
-            # Fotoğraf onaylandıysa kanala yollayalım
             user_text = update.message.caption or update.message.text or "Açıklama yok"
             photo_file_id = update.message.photo[-1].file_id
             
@@ -139,7 +136,7 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data["beklenen_feedback"] = False
             await update.message.reply_text(
-                "Teşekkürler! Yapay zeka ekran görüntüsünü onayladı ve geri bildirimin kanalımıza iletildi. 🚀",
+                "Teşekkürler! Geri bildirimin başarıyla kanalımıza iletildi. 🚀",
                 reply_markup=ana_menu_markup()
             )
 
