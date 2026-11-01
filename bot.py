@@ -11,7 +11,7 @@ logging.basicConfig(
 # Kanal kullanıcı adı
 FEEDBACK_CHANNEL_ID = "@feeedbakcru"
 
-# OpenAI Yapay Zeka Ayarları (Kendi OpenAI API anahtarını buraya yapıştıracaksın)
+# OpenAI Yapay Zeka Ayarları
 client = OpenAI(api_key="BURAYA_OPENAI_API_ANAHTARINI_YAZ")
 
 # Ana Menü
@@ -42,7 +42,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "Evveet! Lütfen ilgili oyunun (PUBG, Roblox, Standoff, Counter-Strike veya Flame) ekran görüntüsünü gönder. Yapay zeka fotoğrafı inceleyip karar verecek!",
+            "Evveet! Lütfen ilgili oyunun (PUBG, Roblox, Standoff, Counter-Strike veya Flame) ekran görüntüsünü gönder. Açıklamaya oyun adı yazmana gerek yok, yapay zeka fotoğrafı kendi tanıyacak!",
             reply_markup=reply_markup
         )
 
@@ -93,32 +93,29 @@ async def yapay_zeka_oyun_kontrolu(photo_file_url):
         return "EVET" in cevap
     except Exception as e:
         print(f"Yapay zeka hata verdi: {e}")
-        return False # Hata çıkarsa risk almamak için reddetsin
+        return False
 
 # Kullanıcının gönderdiği feedback mesajlarını yapay zeka ile denetleyen fonksiyon
 async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
         
-        # 1. KURAL: Fotoğraf zorunluluğu
+        # Fotoğraf zorunluluğu
         if not update.message.photo:
             await update.message.reply_text(
                 "❌ **Hata!** Sadece metin gönderemezsin. Lütfen oyun ekran görüntüsü (fotoğraf) yükle."
             )
             return
 
-        # Kullanıcıya "Yapay zeka inceliyor..." mesajı atalım ki beklediğini bilsin
         bekleme_mesaji = await update.message.reply_text("🤖 Yapay zeka ekran görüntüsünü inceliyor, lütfen bekle...")
 
         try:
-            # Fotoğrafın Telegram'daki dosya nesnesini alıp geçici indirme linkini çekiyoruz
             photo_file = await update.message.photo[-1].get_file()
             photo_url = photo_file.file_path
 
             # Yapay zekaya fotoğrafı yollayıp oyunla ilgili mi diye test ettiriyoruz
             oyun_onaylandi = await yapay_zeka_oyun_kontrolu(photo_url)
 
-            # Bekleme mesajını siliyoruz
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=bekleme_mesaji.message_id)
 
             if not oyun_onaylandi:
@@ -127,7 +124,7 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-            # Fotoğraf onaylandıysa kullanıcı ne yazdıysa metniyle birlikte kanala yollayalım
+            # Fotoğraf onaylandıysa kullanıcı ne yazdıysa (veya boşsa) kanala yollayalım
             user_text = update.message.caption or update.message.text or "Açıklama yok"
             photo_file_id = update.message.photo[-1].file_id
             
@@ -140,7 +137,6 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
 
-            # Başarıyla bitti
             context.user_data["beklenen_feedback"] = False
             await update.message.reply_text(
                 "Teşekkürler! Yapay zeka ekran görüntüsünü onayladı ve geri bildirimin kanalımıza iletildi. 🚀",
@@ -161,3 +157,4 @@ if __name__ == '__main__':
 
     print("Bot çalışıyor...")
     app.run_polling()
+        
