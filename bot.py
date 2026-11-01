@@ -113,7 +113,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Kullanıcının gönderdiği feedback mesajını alıp sana (Admin'e) ileten fonksiyon
 async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Eğer kullanıcı feedback aşamasındaysa
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
         
@@ -127,7 +126,6 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_text = update.message.caption or update.message.text or "Açıklama yok"
         photo_file_id = update.message.photo[-1].file_id
         
-        # Senin özel sohbetine düşecek inceleme mesajı
         admin_mesaji = (
             f"📩 **Yeni Onay Bekleyen Feedback!**\n"
             f"👤 Gönderen: {user.first_name} (@{user.username})\n"
@@ -153,7 +151,6 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
-        # Kullanıcıya bilgi veriyoruz
         context.user_data["beklenen_feedback"] = False
         await update.message.reply_text(
             "🚀 Geri bildirimin ve ekran görüntün inceleme için yetkiliye gönderildi. Onaylandığında kanalda yayınlanacak!",
@@ -171,4 +168,4 @@ if __name__ == '__main__':
 
     print("Bot çalışıyor...")
     app.run_polling()
-    
+        
