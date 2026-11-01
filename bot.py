@@ -10,7 +10,7 @@ logging.basicConfig(
 # Kanal kullanıcı adı
 FEEDBACK_CHANNEL_ID = "@feeedbakcru" 
 
-# İzin verilen oyunlar listesi (küçük harfe çevirerek kontrol edeceğiz)
+# İzin verilen oyunlar listesi
 IZIN_VERILEN_OYUNLAR = ["pubg", "roblox", "standoff", "counter", "flame", "cs"]
 
 # Ana Menü
@@ -41,7 +41,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "Evveet! Hangi oyun için yazıyorsun? (PUBG, Roblox, Standoff, Counter, Flame)\nLütfen oyun adını da belirterek istek veya geri bildiriminizi yazın:",
+            "Evveet! Hangi oyun için feedback atıyorsun? \n⚠️ **Önemli:** Mutlaka **ekran görüntüsü (fotoğraf)** göndermelisin ve açıklama kısmına oyun adını (PUBG, Roblox, Standoff, Counter, Flame) yazmalısın. Sadece metin kabul edilmez!",
             reply_markup=reply_markup
         )
 
@@ -70,41 +70,42 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
-        user_text = update.message.text or update.message.caption or ""
         
-        # Kullanıcının yazdığı mesajı küçük harfe çevirip oyunların geçip geçmediğini kontrol ediyoruz
+        # 1. KURAL: Fotoğraf zorunluluğu (Eğer fotoğraf yoksa hata ver)
+        if not update.message.photo:
+            await update.message.reply_text(
+                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükleyerek tekrar dene."
+            )
+            return
+
+        # Fotoğrafın üzerindeki yazı (caption) veya kullanıcının gönderdiği metin
+        user_text = update.message.caption or ""
         mesaj_kucuk = user_text.lower()
+        
+        # 2. KURAL: Oyun adı kontrolü
         oyun_bulundu = any(oyun in mesaj_kucuk for oyun in IZIN_VERILEN_OYUNLAR)
 
-        # Eğer izin verilen oyunlardan biri geçmiyorsa hata ver ve kanala atma
         if not oyun_bulundu:
             await update.message.reply_text(
-                "❌ **Hata!** Gönderdiğiniz mesajda desteklenen oyunlardan biri (PUBG, Roblox, Standoff, Counter, Flame) bulunamadı. Lütfen geçerli bir oyun belirterek tekrar yazın."
+                "❌ **Hata!** Gönderdiğiniz fotoğrafın açıklamasında desteklenen oyunlardan biri (PUBG, Roblox, Standoff, Counter, Flame) bulunamadı. Lütfen açıklama kısmına oyun adını ekleyerek tekrar fotoğraf gönderin."
             )
-            return  # Burada işlemi kesiyoruz, kanala göndermiyor
+            return
 
-        # Oyun bulunduysa kanala ilet
-        baslik = f"📩 **Yeni Feedback Var!**\n👤 Gönderen: {user.first_name} (@{user.username})\n🆔 ID: `{user.id}`\n\n💬 **Mesaj:** {user_text}"
+        # Her şey uygunsa fotoğrafı ve bilgileri kanala ilet
+        photo_file_id = update.message.photo[-1].file_id
+        baslik = f"📩 **Yeni Feedback Var!**\n👤 Gönderen: {user.first_name} (@{user.username})\n🆔 ID: `{user.id}`\n\n💬 **Açıklama:** {user_text}"
 
-        if update.message.photo:
-            photo_file_id = update.message.photo[-1].file_id
-            await context.bot.send_photo(
-                chat_id=FEEDBACK_CHANNEL_ID,
-                photo=photo_file_id,
-                caption=baslik,
-                parse_mode="Markdown"
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=FEEDBACK_CHANNEL_ID,
-                text=baslik,
-                parse_mode="Markdown"
-            )
+        await context.bot.send_photo(
+            chat_id=FEEDBACK_CHANNEL_ID,
+            photo=photo_file_id,
+            caption=baslik,
+            parse_mode="Markdown"
+        )
 
         # Durumu sıfırla ve ana menü butonlarıyla teşekkür et
         context.user_data["beklenen_feedback"] = False
         await update.message.reply_text(
-            "Teşekkürler! Geri bildiriminiz başarıyla kanalımıza iletildi. 🚀",
+            "Teşekkürler! Ekran görüntünüz ve geri bildiriminiz başarıyla kanalımıza iletildi. 🚀",
             reply_markup=ana_menu_markup()
         )
 
@@ -119,4 +120,3 @@ if __name__ == '__main__':
 
     print("Bot çalışıyor...")
     app.run_polling()
-    
