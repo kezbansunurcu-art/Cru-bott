@@ -19,7 +19,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     # Token'ın
-    TOKEN = "AAGQHq_lfgvKjYJLN0oXdTjw4kZPN3tUcfg"
+    TOKEN = "8710503570:AAGQHq_lfgvKjYJLN0oXdTjw4kZPN3tUcfg"
 
     app = ApplicationBuilder().token(TOKEN).build()
 
