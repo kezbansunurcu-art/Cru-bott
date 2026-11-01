@@ -1,4 +1,7 @@
 import logging
+import os
+from threading import Thread
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -6,6 +9,23 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+
+# --- 1. KISIM: Render'ı uyandırık tutmak için Flask Sunucusu ---
+app_flask = Flask('')
+
+@app_flask.route('/')
+def home():
+    return "Cruise Bot Aktif ve Çalışıyor! 🚀"
+
+def run_flask():
+    # Render'ın verdiği PORT'u kullanır, yoksa yerelde 8080'de açılır
+    port = int(os.environ.get("PORT", 8080))
+    app_flask.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.start()
+# -----------------------------------------------------------
 
 # Kanal kullanıcı adı ve senin Telegram ID'n
 FEEDBACK_CHANNEL_ID = "@feeedbakcru"
@@ -35,7 +55,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = update.effective_user.id
 
-    # 1. Kullanıcı Feedback başlatmak isterse
     if data == "feedback_basla":
         context.user_data["beklenen_feedback"] = True
         keyboard = [[InlineKeyboardButton("🔙 Ana Menüye Dön", callback_data="ana_menu_don")]]
@@ -46,7 +65,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
-    # 2. Sosyal Medya Menüsü
     elif data == "sosyal_menu":
         keyboard = [
             [InlineKeyboardButton("📢 Telegram Kanalım", url="https://t.me/+3Bwdx2XCQtdlY2Vk")],
@@ -61,7 +79,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
-    # 3. Ana Menüye Dönüş
     elif data == "ana_menu_don":
         context.user_data["beklenen_feedback"] = False
         await query.edit_message_text(
@@ -69,7 +86,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ana_menu_markup()
         )
 
-    # 4. Sadece Senin (Admin) kullanabileceğin Onay Butonu
     elif data.startswith("onayla_"):
         if user_id != ADMIN_ID:
             await query.answer("Bu işlemi yapmaya yetkin yok!", show_alert=True)
@@ -96,7 +112,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.edit_message_caption(caption=f"⚠️ Hata oluştu: {str(e)}")
 
-    # 5. Sadece Senin (Admin) kullanabileceğin Red Butonu
     elif data.startswith("reddet_"):
         if user_id != ADMIN_ID:
             await query.answer("Bu işlemi yapmaya yetkin yok!", show_alert=True)
@@ -111,12 +126,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Reddetme hatası: {e}")
 
-# Kullanıcının gönderdiği feedback mesajını alıp sana (Admin'e) ileten fonksiyon
 async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
         
-        # Fotoğraf zorunluluğu
         if not update.message.photo:
             await update.message.reply_text(
                 "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükle."
@@ -142,7 +155,6 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Doğrudan senin ID'ne (ADMIN_ID) fotoğrafı ve butonları gönderiyoruz
         await context.bot.send_photo(
             chat_id=ADMIN_ID,
             photo=photo_file_id,
@@ -158,14 +170,17 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 if __name__ == '__main__':
-    TOKEN = "8710503570:AAGQHq_lfgvKjYJLN0oXdTjw4kZPN3tUcfg"
+    # 1. Flask sunucusunu arka planda başlat (Uykuyu önlemek için)
+    keep_alive()
 
+    # 2. Telegram Botunu başlat
+    TOKEN = "8710503570:AAGQHq_lfgvKjYJLN0oXdTjw4kZPN3tUcfg"
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & (~filters.COMMAND), feedback_alici))
 
-    print("Bot çalışıyor...")
+    print("Bot ve Web Sunucusu çalışıyor...")
     app.run_polling()
-        
+    
