@@ -1,41 +1,34 @@
+import logging
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-import os
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+# Loglama ayarları (terminalde hareketleri görmek için)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
-TOKEN = os.environ["BOT_TOKEN"]
-
-SITE = "https://yenisitecru.netlify.app"
-KANAL = "https://t.me/+3Bwdx2XCQtdlY2Vk"
-TIKTOK = "https://tiktok.com/@cruiseno15"
-
-
+# /start komutu
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🌐 SİTEM", url=SITE)],
-        [InlineKeyboardButton("📢 TELEGRAM KANALIM", url=KANAL)]
-    ]
+    user_name = update.effective_user.first_name
+    await update.message.reply_text(f"Selam {user_name}! Cruise bot başarıyla çalıştı 🚀")
 
-    await update.message.reply_text(
-        "👋 Hoş geldin!\n\nBağlantılardan birini seç:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+# Kullanıcının yazdığı normal metinlere cevap veren fonksiyon
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
+    await update.message.reply_text(f"Bana şunu yazdın: {user_message}")
 
+if __name__ == '__main__':
+    # Token'ın
+    TOKEN = "AAGQHq_lfgvKjYJLN0oXdTjw4kZPN3tUcfg"
 
-async def sosyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🎵 TikTok", url=TIKTOK)]
-    ]
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    await update.message.reply_text(
-        "📱 Sosyal medya hesaplarım:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # Komut dinleyicileri
+    app.add_handler(CommandHandler("start", start))
 
+    # Normal metin mesajlarını dinleyen handler
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), echo))
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("sosyal", sosyal))
-
-print("BOT ÇALIŞIYOR!")
-app.run_polling()
+    print("Bot çalışıyor...")
+    app.run_polling()
+    
