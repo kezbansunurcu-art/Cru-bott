@@ -42,7 +42,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "Evveet! Lütfen ilgili oyunun (PUBG, Roblox, Standoff, Counter-Strike veya Flame) ekran görüntüsünü gönder. Açıklamaya oyun adı yazmana gerek yok, yapay zeka fotoğrafı kendi tanıyacak!",
+            "Evveet! Lütfen ilgili oyunun (PUBG, Roblox, Standoff, Counter-Strike veya Flame) ekran görüntüsünü (SS'ini) gönder. Yapay zeka kontrol edip onaylayacak!",
             reply_markup=reply_markup
         )
 
@@ -78,11 +78,11 @@ async def yapay_zeka_oyun_kontrolu(photo_file_url):
                     "content": [
                         {
                             "type": "text",
-                            "text": "Bu fotoğraf şu oyunlardan birine (PUBG, Roblox, Standoff 2, Counter-Strike/CS, Flame) ait mi? Sadece 'EVET' veya 'HAYIR' olarak cevap ver. Başka hiçbir şey yazma."
+                            "text": "Bu fotoğraf PUBG, Roblox, Standoff, Counter-Strike (CS) veya Flame oyunlarından birine ait bir ekran görüntüsü (SS) mü? Sadece 'EVET' veya 'HAYIR' olarak cevap ver. Başka hiçbir şey yazma."
                         },
                         {
-                            "type": "image_url",
-                            "image_url": {"url": photo_file_url}
+                            "image_url": {"url": photo_file_url},
+                            "type": "image_url"
                         }
                     ]
                 }
@@ -103,7 +103,7 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Fotoğraf zorunluluğu
         if not update.message.photo:
             await update.message.reply_text(
-                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen oyun ekran görüntüsü (fotoğraf) yükle."
+                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükle."
             )
             return
 
@@ -113,18 +113,18 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
             photo_file = await update.message.photo[-1].get_file()
             photo_url = photo_file.file_path
 
-            # Yapay zekaya fotoğrafı yollayıp oyunla ilgili mi diye test ettiriyoruz
+            # Yapay zekaya fotoğrafı yollayıp oyun ekran görüntüsü mü diye test ettiriyoruz
             oyun_onaylandi = await yapay_zeka_oyun_kontrolu(photo_url)
 
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=bekleme_mesaji.message_id)
 
             if not oyun_onaylandi:
                 await update.message.reply_text(
-                    "❌ **Yapay Zeka Reddetti!** Gönderdiğin fotoğraf desteklenen oyunlardan (PUBG, Roblox, Standoff, Counter, Flame) birine ait görünmüyor. Lütfen geçerli bir oyun ekran görüntüsü at."
+                    "❌ **Yapay Zeka Reddetti!** Bu fotoğraf desteklenen oyunlardan (PUBG, Roblox, Standoff, Counter, Flame) birine ait bir ekran görüntüsü gibi görünmüyor. Lütfen geçerli bir oyun SS'i at."
                 )
                 return
 
-            # Fotoğraf onaylandıysa kullanıcı ne yazdıysa (veya boşsa) kanala yollayalım
+            # Fotoğraf onaylandıysa kanala yollayalım
             user_text = update.message.caption or update.message.text or "Açıklama yok"
             photo_file_id = update.message.photo[-1].file_id
             
@@ -157,4 +157,4 @@ if __name__ == '__main__':
 
     print("Bot çalışıyor...")
     app.run_polling()
-        
+            
