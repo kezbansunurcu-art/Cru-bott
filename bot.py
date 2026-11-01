@@ -1,6 +1,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from openai import OpenAI
 
 # Loglama ayarları
 logging.basicConfig(
@@ -8,10 +9,10 @@ logging.basicConfig(
 )
 
 # Kanal kullanıcı adı
-FEEDBACK_CHANNEL_ID = "@feeedbakcru" 
+FEEDBACK_CHANNEL_ID = "@feeedbakcru"
 
-# İzin verilen oyunlar listesi
-IZIN_VERILEN_OYUNLAR = ["pubg", "roblox", "standoff", "counter", "flame", "cs"]
+# OpenAI Yapay Zeka Ayarları (Kendi OpenAI API anahtarını buraya yapıştıracaksın)
+client = OpenAI(api_key="BURAYA_OPENAI_API_ANAHTARINI_YAZ")
 
 # Ana Menü
 def ana_menu_markup():
@@ -41,7 +42,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "Evveet! Lütfen ekran görüntüsünü (fotoğrafı) ve hangi oyunla ilgili olduğunu (PUBG, Roblox, Standoff, Counter, Flame) birlikte gönder:",
+            "Evveet! Lütfen ilgili oyunun (PUBG, Roblox, Standoff, Counter-Strike veya Flame) ekran görüntüsünü gönder. Yapay zeka fotoğrafı inceleyip karar verecek!",
             reply_markup=reply_markup
         )
 
@@ -66,7 +67,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ana_menu_markup()
         )
 
-# Kullanıcının gönderdiği feedback mesajlarını kontrol edip işleyen fonksiyon
+# Yapay Zeka ile Fotoğrafı Analiz Etme Fonksiyonu
+async def yapay_zeka_oyun_kontrolu(photo_file_url):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Bu fotoğraf şu oyunlardan birine (PUBG, Roblox, Standoff 2, Counter-Strike/CS, Flame) ait mi? Sadece 'EVET' veya 'HAYIR' olarak cevap ver. Başka hiçbir şey yazma."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": photo_file_url}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=5
+        )
+        cevap = response.choices[0].message.content.strip().upper()
+        return "EVET" in cevap
+    except Exception as e:
+        print(f"Yapay zeka hata verdi: {e}")
+        return False # Hata çıkarsa risk almamak için reddetsin
+
+# Kullanıcının gönderdiği feedback mesajlarını yapay zeka ile denetleyen fonksiyon
 async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("beklenen_feedback"):
         user = update.effective_user
@@ -74,40 +103,52 @@ async def feedback_alici(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 1. KURAL: Fotoğraf zorunluluğu
         if not update.message.photo:
             await update.message.reply_text(
-                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen ekran görüntüsü (fotoğraf) yükle."
+                "❌ **Hata!** Sadece metin gönderemezsin. Lütfen oyun ekran görüntüsü (fotoğraf) yükle."
             )
             return
 
-        # Fotoğrafın üzerindeki yazı (caption) VEYA kullanıcının aynı anda yazdığı metni alıyoruz
-        user_text = update.message.caption or update.message.text or ""
-        mesaj_kucuk = user_text.lower()
-        
-        # 2. KURAL: Oyun adı kontrolü (Metni direkt tarıyor)
-        oyun_bulundu = any(oyun in mesaj_kucuk for oyun in IZIN_VERILEN_OYUNLAR)
+        # Kullanıcıya "Yapay zeka inceliyor..." mesajı atalım ki beklediğini bilsin
+        bekleme_mesaji = await update.message.reply_text("🤖 Yapay zeka ekran görüntüsünü inceliyor, lütfen bekle...")
 
-        if not oyun_bulundu:
+        try:
+            # Fotoğrafın Telegram'daki dosya nesnesini alıp geçici indirme linkini çekiyoruz
+            photo_file = await update.message.photo[-1].get_file()
+            photo_url = photo_file.file_path
+
+            # Yapay zekaya fotoğrafı yollayıp oyunla ilgili mi diye test ettiriyoruz
+            oyun_onaylandi = await yapay_zeka_oyun_kontrolu(photo_url)
+
+            # Bekleme mesajını siliyoruz
+            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=bekleme_mesaji.message_id)
+
+            if not oyun_onaylandi:
+                await update.message.reply_text(
+                    "❌ **Yapay Zeka Reddetti!** Gönderdiğin fotoğraf desteklenen oyunlardan (PUBG, Roblox, Standoff, Counter, Flame) birine ait görünmüyor. Lütfen geçerli bir oyun ekran görüntüsü at."
+                )
+                return
+
+            # Fotoğraf onaylandıysa kullanıcı ne yazdıysa metniyle birlikte kanala yollayalım
+            user_text = update.message.caption or update.message.text or "Açıklama yok"
+            photo_file_id = update.message.photo[-1].file_id
+            
+            baslik = f"📩 **Yapay Zeka Onaylı Feedback!**\n👤 Gönderen: {user.first_name} (@{user.username})\n🆔 ID: `{user.id}`\n\n💬 **Mesaj:** {user_text}"
+
+            await context.bot.send_photo(
+                chat_id=FEEDBACK_CHANNEL_ID,
+                photo=photo_file_id,
+                caption=baslik,
+                parse_mode="Markdown"
+            )
+
+            # Başarıyla bitti
+            context.user_data["beklenen_feedback"] = False
             await update.message.reply_text(
-                "❌ **Hata!** Gönderdiğin mesajda/açıklamada desteklenen oyunlardan biri (PUBG, Roblox, Standoff, Counter, Flame) bulunamadı. Lütfen oyun adını da ekleyerek tekrar gönder."
+                "Teşekkürler! Yapay zeka ekran görüntüsünü onayladı ve geri bildirimin kanalımıza iletildi. 🚀",
+                reply_markup=ana_menu_markup()
             )
-            return
 
-        # Her şey uygunsa fotoğrafı ve metni kanala ilet
-        photo_file_id = update.message.photo[-1].file_id
-        baslik = f"📩 **Yeni Feedback Var!**\n👤 Gönderen: {user.first_name} (@{user.username})\n🆔 ID: `{user.id}`\n\n💬 **Mesaj:** {user_text}"
-
-        await context.bot.send_photo(
-            chat_id=FEEDBACK_CHANNEL_ID,
-            photo=photo_file_id,
-            caption=baslik,
-            parse_mode="Markdown"
-        )
-
-        # Durumu sıfırla ve ana menü butonlarıyla teşekkür et
-        context.user_data["beklenen_feedback"] = False
-        await update.message.reply_text(
-            "Teşekkürler! Ekran görüntünüz ve geri bildiriminiz başarıyla kanalımıza iletildi. 🚀",
-            reply_markup=ana_menu_markup()
-        )
+        except Exception as e:
+            await update.message.reply_text(f"Bir hata oluştu: {str(e)}")
 
 if __name__ == '__main__':
     TOKEN = "8710503570:AAGQHq_lfgvKjYJLN0oXdTjw4kZPN3tUcfg"
@@ -120,4 +161,3 @@ if __name__ == '__main__':
 
     print("Bot çalışıyor...")
     app.run_polling()
-    
